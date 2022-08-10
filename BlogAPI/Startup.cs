@@ -1,4 +1,6 @@
 using BlogAPI.Src.Contextos;
+using BlogAPI.Src.Repositorios;
+using BlogAPI.Src.Repositorios.Implentacoes;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
@@ -26,26 +28,42 @@ namespace BlogAPI
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            // Configuração de Banco de dados
-            services.AddDbContext<BlogPessoalContexto>(opt =>
-            opt.UseSqlServer(Configuration["ConnectionStringsDev:DefaultConnection"]));
+            // Contexto
+            services.AddDbContext<BlogPessoalContexto>(opt => opt.UseSqlServer(Configuration["ConnectionStringsDev:DefaultConnection"]));
+
+            // Repositorios
+            services.AddScoped<IUsuario, UsuarioRepositorio>();
+            services.AddScoped<ITema, TemaRepositorio>();
+            services.AddScoped<IPostagem, PostagemRepositorio>();
+
             // Controladores
+            services.AddCors();
             services.AddControllers();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env, BlogPessoalContexto contexto)
         {
-            // Ambiente de Desenvolvimento
+            // Ambiente de desenvolvimento
             if (env.IsDevelopment())
             {
                 contexto.Database.EnsureCreated();
                 app.UseDeveloperExceptionPage();
             }
+
             // Ambiente de produção
             contexto.Database.EnsureCreated();
+
             app.UseRouting();
+
+            app.UseCors(c => c
+                .AllowAnyOrigin()
+                .AllowAnyMethod()
+                .AllowAnyHeader()
+                );
+
             app.UseAuthorization();
+
             app.UseEndpoints(endpoints =>
             {
                 endpoints.MapControllers();
