@@ -16,15 +16,17 @@ namespace BlogAPI.Src.Controladores
         #region Atributos
 
         private readonly IUsuario _repositorio;
+        private readonly IAutenticacao _servicos;
 
         #endregion
 
 
         #region Construtores
 
-        public UsuarioControlador(IUsuario repositorio)
+        public UsuarioControlador(IUsuario repositorio, IAutenticacao servicos)
         {
             _repositorio = repositorio;
+            _servicos = servicos;
         }
 
         #endregion
@@ -32,24 +34,57 @@ namespace BlogAPI.Src.Controladores
 
         #region Métodos
 
-        [HttpPost]
+        [HttpGet]
+        public async Task<ActionResult> PegarTodosUsuariosAync()
+        {
+            var lista = await _repositorio.PegarTodosUsuariosAsync();
+
+            if (lista.Count < 1) return NoContent();
+
+            return Ok(lista);
+        }
+
+        [HttpPost("cadastrar")]
         public async Task<ActionResult> NovoUsuarioAsync([FromBody] Usuario usuario)
         {
-            await _repositorio.NovoUsuarioAsync(usuario);
+            try
+            {
+                await _repositorio.NovoUsuarioAsync(usuario);
+                return Created($"api/Usuarios/{usuario.Email}", usuario);
+            }
+            catch (Exception ex)
+            {
+                return Unauthorized(ex.Message);
+            }
+        }
+        
+        [HttpPost("logar")]
+        [AllowAnonymous]
+        public async Task<ActionResult> LogarAsync([FromBody] Usuario usuario)
+        {
+            var auxiliar = await _repositorio.PegarUsuarioPeloEmailAsync(usuario.Email);
 
-            return Created($"api/Usuarios/{usuario.Email}", usuario);
+            if (auxiliar == null) return Unauthorized(new { Mensagem = "E-mail invalido" });
+
+            if (auxiliar.Senha != _servicos.codificarSenha(usuario.Senha))
+                return Unauthorized(new { Mensagem = "Senha invalida" });
+
+            var token = "Bearer" + _servicos.GerarToken(auxiliar);
+            return Ok(new { usuario = auxiliar, Token = token });
         }
 
         [HttpGet("email/{emailUsuario}")]
-        public async Task<ActionResult> PegarUsuarioPeloEmailAsync([FromRoute] string emailUsuario)
+        public async Task<ActionResult> PegarUsuarioPeloEmailAsync([FromRoute] string
+        emailUsuario)
         {
             var usuario = await _repositorio.PegarUsuarioPeloEmailAsync(emailUsuario);
-
-            if (usuario == null) return NotFound(new { Mensagem = "Usuario não encontrado" });
-
+            if (usuario == null) return NotFound(new
+            {
+                Mensagem = "Usuario não encontrado" });
             return Ok(usuario);
         }
 
         #endregion
     }
+
 }
